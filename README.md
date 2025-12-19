@@ -1,6 +1,6 @@
 # Halliday API Examples with Privy Wallet
 
-Halliday Payments API integration examples using a Privy wallet. This project uses the Vite React template and the Privy React SDK. The Halliday API is accessed over HTTP directly without using the SDK.
+Halliday Payments API integration examples using a Privy wallet. This project uses the Vite React template and the Privy React SDK. The Halliday API is accessed over HTTP directly without using the SDK. To connect the Privy wallet to the app, Ethers.js 6 is used with the Privy React SDK.
 
 ### Keys
 
