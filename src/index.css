@@ -7,8 +7,8 @@
 }
 
 /* CSS Custom Properties for Theming */
+/* Light mode (default) */
 :root {
-  /* Light mode (default) */
   --bg-primary: #f5f5f5;
   --bg-secondary: #fff;
   --bg-tertiary: #f9f9f9;
@@ -35,15 +35,15 @@
   
   --error-color: #ff3300;
   
-  /* Home page specific */
   --home-bg: #1a1a2e;
   --home-border: #2a2a4a;
   --home-text: #fff;
   --home-text-secondary: #888;
 }
 
+/* Dark mode - auto (respects system preference when no manual override) */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not(.light) {
     --bg-primary: #121212;
     --bg-secondary: #1e1e1e;
     --bg-tertiary: #2a2a2a;
@@ -75,6 +75,74 @@
     --home-text: #fff;
     --home-text-secondary: #888;
   }
+}
+
+/* Dark mode - manual override */
+:root.dark {
+  --bg-primary: #121212;
+  --bg-secondary: #1e1e1e;
+  --bg-tertiary: #2a2a2a;
+  --bg-hover: #1a2e1f;
+  --bg-button-disabled: #3a3a3a;
+  --bg-back-button: #2a2a2a;
+  
+  --text-primary: #e0e0e0;
+  --text-secondary: #a0a0a0;
+  --text-tertiary: #777;
+  --text-placeholder: #666;
+  --text-disabled: #555;
+  --text-link: #e0e0e0;
+  
+  --border-primary: #3a3a3a;
+  --border-secondary: #2a2a2a;
+  
+  --accent-primary: #3df57b;
+  --accent-hover: #2de56b;
+  --accent-bg: #1a2e1f;
+  
+  --shadow-color: rgba(0, 0, 0, 0.3);
+  --shadow-accent: rgba(61, 245, 123, 0.2);
+  
+  --error-color: #ff5544;
+
+  --home-bg: #1a1a2e;
+  --home-border: #2a2a4a;
+  --home-text: #fff;
+  --home-text-secondary: #888;
+}
+
+/* Theme Toggle Button */
+.theme-toggle {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  border: 1px solid var(--border-primary);
+  border-radius: 2rem;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  cursor: pointer;
+  font-size: 0.875rem;
+  font-family: inherit;
+  transition: all 0.2s ease;
+}
+
+.theme-toggle:hover {
+  border-color: var(--accent-primary);
+  background: var(--bg-hover);
+}
+
+.theme-icon {
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.theme-label {
+  font-weight: 500;
 }
 
 body,
