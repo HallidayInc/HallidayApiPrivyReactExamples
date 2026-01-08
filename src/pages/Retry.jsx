@@ -208,12 +208,26 @@ function Retry() {
   }
 
   // Fetch erring payments
-  async function showErringPayments(address, assets) {
+  async function showErringPayments(walletAddress, assets) {
     setIsLoadingHistory(true)
     setErringPayments([])
 
+    // // Fetch the full payment history using pagination
+    // const payments = []
+    // let paginationKey
+    // do {
+    //   const history = await getWalletPaymentHistory(walletAddress, paginationKey)
+    //   if (history.next_pagination_key) {
+    //     paginationKey = history.next_pagination_key
+    //   } else {
+    //     paginationKey = undefined
+    //   }
+    //   payments.push(...history.payment_statuses)
+    // } while (paginationKey)
+
+    // Get first X payments, no pagination of API responses
     const numPaymentsToFetch = 15
-    const history = await getWalletPaymentHistory(address)
+    const history = await getWalletPaymentHistory(walletAddress)
     const payments = history.payment_statuses.slice(0, numPaymentsToFetch)
 
     const erring = []

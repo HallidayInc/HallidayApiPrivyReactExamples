@@ -10,7 +10,7 @@ Get a Halliday API key: https://halliday.xyz/contact
 
 ### Run
 
-Edit the `.env` files by inserting the Privy and Halliday keys.
+Create the `.env` files and supplant the Privy and Halliday keys. See `.env.example` for reference.
 
 ```
 VITE_PRIVY_APP_ID=_your_privy_app_id_here_
