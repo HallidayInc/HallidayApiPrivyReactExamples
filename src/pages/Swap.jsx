@@ -42,8 +42,9 @@ function Swap() {
   const loadingTimeoutRef = useRef(null)
   const statusIntervalRef = useRef(null)
 
-  // Get Privy embedded wallet
-  const privyWallet = wallets.find(w => w.walletClientType === 'privy')
+  // Get wallet, may be Privy embedded or other like EIP-1193
+  // const wallet = wallets.find(w => w.walletClientType === 'privy')
+  const wallet = wallets[0]
 
   // Validation helpers
   const validateAmountInput = (value) => /^[0-9]*\.?[0-9]*$/.test(value)
@@ -73,13 +74,13 @@ function Swap() {
 
   // Show wallet balance of input token
   async function showWalletBalanceOfInputToken(address) {
-    if (!privyWallet) return
+    if (!wallet) return
 
     try {
       // Switch to Base chain if needed
-      await privyWallet.switchChain(FROM_CHAIN_ID)
+      await wallet.switchChain(FROM_CHAIN_ID)
 
-      const ethersProvider = await privyWallet.getEthereumProvider()
+      const ethersProvider = await wallet.getEthereumProvider()
       const provider = new ethers.BrowserProvider(ethersProvider)
       const inputTokenContract = new ethers.Contract(INPUT_TOKEN_ADDRESS, ERC20_ABI, provider)
       const [balance, decimals] = await getErc20Balance(address, inputTokenContract)
@@ -233,8 +234,8 @@ function Swap() {
       const fundAmount = acceptedSwap.quoted.route[0].net_effect.consume[0].amount
       const fundAddress = acceptedSwap.processing_addresses[0].address
 
-      await privyWallet.switchChain(FROM_CHAIN_ID)
-      const ethersProvider = await privyWallet.getEthereumProvider()
+      await wallet.switchChain(FROM_CHAIN_ID)
+      const ethersProvider = await wallet.getEthereumProvider()
       const provider = new ethers.BrowserProvider(ethersProvider)
       const signer = await provider.getSigner()
       const inputTokenWithSigner = new ethers.Contract(INPUT_TOKEN_ADDRESS, ERC20_ABI, signer)
@@ -260,14 +261,14 @@ function Swap() {
 
   // Effect: set address when authenticated
   useEffect(() => {
-    if (authenticated && privyWallet?.address) {
-      setUserAddress(privyWallet.address)
-      showWalletBalanceOfInputToken(privyWallet.address)
+    if (authenticated && wallet?.address) {
+      setUserAddress(wallet.address)
+      showWalletBalanceOfInputToken(wallet.address)
     } else {
       setUserAddress('')
       setWalletBalance(null)
     }
-  }, [authenticated, privyWallet?.address])
+  }, [authenticated, wallet?.address])
 
   // Effect: debounced quote fetching
   useEffect(() => {
@@ -325,7 +326,7 @@ function Swap() {
       <p className="info-label">
         Connected wallet address to perform swap:
         <br />
-        <span className="address-label">{privyWallet?.address || 'Loading...'}</span>
+        <span className="address-label">{wallet?.address || 'Loading...'}</span>
         <br />
         <button className="disconnect" onClick={logout}>Disconnect</button>
       </p>

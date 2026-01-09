@@ -20,8 +20,9 @@ function Withdraw() {
   const [selectedPayment, setSelectedPayment] = useState(null)
   const [withdrawalOptions, setWithdrawalOptions] = useState([])
 
-  // Get Privy embedded wallet
-  const privyWallet = wallets.find(w => w.walletClientType === 'privy')
+  // Get wallet, may be Privy embedded or other like EIP-1193
+  // const wallet = wallets.find(w => w.walletClientType === 'privy')
+  const wallet = wallets[0]
 
   // API calls
   async function getSupportedAssets() {
@@ -241,7 +242,7 @@ function Withdraw() {
       delete types.EIP712Domain
 
       // Sign the withdraw transaction using Privy wallet
-      const ethereumProvider = await privyWallet.getEthereumProvider()
+      const ethereumProvider = await wallet.getEthereumProvider()
       const provider = new ethers.BrowserProvider(ethereumProvider)
       const signer = await provider.getSigner()
       const signature = await signer.signTypedData(domain, types, message)
@@ -284,13 +285,13 @@ function Withdraw() {
 
   // Effect: set address when authenticated
   useEffect(() => {
-    if (authenticated && privyWallet?.address) {
-      setUserAddress(privyWallet.address)
+    if (authenticated && wallet?.address) {
+      setUserAddress(wallet.address)
     } else {
       setUserAddress('')
       setErringPayments([])
     }
-  }, [authenticated, privyWallet?.address])
+  }, [authenticated, wallet?.address])
 
   // Effect: fetch supported assets and chains on mount
   useEffect(() => {
@@ -334,7 +335,7 @@ function Withdraw() {
       <p className="info-label">
         Connected wallet address to perform withdrawal:
         <br />
-        <span className="address-label">{privyWallet?.address || 'Loading...'}</span>
+        <span className="address-label">{wallet?.address || 'Loading...'}</span>
         <br />
         <button className="disconnect" onClick={logout}>Disconnect</button>
       </p>
