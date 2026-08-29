@@ -110,7 +110,7 @@ function Swap() {
     })
 
     const data = await res.json()
-    console.log('getQuote', data)
+    console.log('getQuote response status:', res.status, 'quote count:', data?.quotes?.length ?? 0)
 
     const expiration = new Date(data.accept_by)
     const stateToken = data.state_token
@@ -174,7 +174,7 @@ function Swap() {
       throw new Error(JSON.stringify(data))
     }
 
-    console.log('acceptQuote', data)
+    console.log('acceptQuote response status:', res.status)
     return data
   }
 
@@ -193,7 +193,7 @@ function Swap() {
       throw new Error(JSON.stringify(data))
     }
 
-    console.log('getSwapStatus', data)
+    console.log('getSwapStatus response status:', res.status, 'payment status:', data?.status)
     return data
   }
 
@@ -212,9 +212,13 @@ function Swap() {
     try {
       let confirmResult = await acceptQuote()
 
-      // Handle user verification if required (>= $300 owner verify, >= $1M withdrawal sim)
-      // Loop to handle up to two verification round-trips
+      // Limit verification round-trips to prevent an unbounded signing loop.
+      let verificationAttempts = 0
       while (confirmResult.next_instruction?.type === 'USER_VERIFY') {
+        if (verificationAttempts >= 3) {
+          throw new Error('User verification did not complete after 3 attempts.')
+        }
+        verificationAttempts += 1
         const { verification_token, verifications } = confirmResult.next_instruction
         const ethersProvider = await wallet.getEthereumProvider()
         const provider = new ethers.BrowserProvider(ethersProvider)
@@ -251,8 +255,13 @@ function Swap() {
           setIsLoading(false)
           return
         } else if (verifyRes.status === 401) {
-          console.warn('Signature verification failed, retrying...')
+          if (verificationAttempts >= 3) {
+            throw new Error('Signature verification failed after 3 attempts.')
+          }
+          console.warn(`Signature verification failed (attempt ${verificationAttempts}/3); retrying...`)
           continue
+        } else if (!verifyRes.ok) {
+          throw new Error(`Verification request failed with status ${verifyRes.status}.`)
         }
 
         confirmResult = await verifyRes.json()
