@@ -200,7 +200,7 @@ function Withdraw() {
 
   // Handle withdraw button click
   function handleWithdrawClick(paymentInfo, balances) {
-    console.log('withdraw: id', paymentInfo.paymentId, 'payment', paymentInfo.payment, 'balances', balances)
+    console.log('Opening withdrawal flow for payment:', paymentInfo.paymentId)
     setSelectedPayment(paymentInfo)
 
     // Build withdrawal options

@@ -158,7 +158,7 @@ function Retry() {
     })
 
     const data = await res.json()
-    console.log('getQuote', data)
+    console.log('getQuote response status:', res.status, 'quote count:', data?.quotes?.length ?? 0)
     return data
   }
 
@@ -182,7 +182,7 @@ function Retry() {
 
       const data = await res.json()
       if (!res.ok) throw new Error(JSON.stringify(data))
-      console.log('acceptQuote', data)
+      console.log('acceptQuote response status:', res.status)
       return data
     } catch (e) {
       console.error('acceptQuote error', e)
@@ -201,7 +201,7 @@ function Retry() {
 
       const data = await res.json()
       if (!res.ok) throw new Error(JSON.stringify(data))
-      console.log('getStatus', data)
+      console.log('getStatus response status:', res.status, 'payment status:', data?.status)
       return data
     } catch (e) {
       console.error('getStatus error', e)
@@ -275,7 +275,7 @@ function Retry() {
 
   // Handle retry button click
   async function handleRetryClick(paymentInfo, balances) {
-    console.log('withdraw: id', paymentInfo.paymentId, 'payment', paymentInfo.payment, 'balances', balances)
+    console.log('Opening withdrawal flow for payment:', paymentInfo.paymentId)
     setSelectedPayment(paymentInfo)
     setSelectedBalances(balances)
 
@@ -330,9 +330,13 @@ function Retry() {
       // Accept the retry quote
       let confirmResult = await acceptQuote(option.newPaymentId, option.newStateToken)
 
-      // Handle user verification if required (>= $300 owner verify, >= $1M withdrawal sim)
-      // Loop to handle up to two verification round-trips
+      // Limit verification round-trips to prevent an unbounded signing loop.
+      let verificationAttempts = 0
       while (confirmResult?.next_instruction?.type === 'USER_VERIFY') {
+        if (verificationAttempts >= 3) {
+          throw new Error('User verification did not complete after 3 attempts.')
+        }
+        verificationAttempts += 1
         const { verification_token, verifications } = confirmResult.next_instruction
         const ethereumProvider = await wallet.getEthereumProvider()
         const provider = new ethers.BrowserProvider(ethereumProvider)
@@ -366,10 +370,18 @@ function Retry() {
           break // Already confirmed — treat as success
         } else if (verifyRes.status === 400) {
           alert('Quote expired. Please try again.')
+          setWithdrawalOptions(prev => prev.map((opt, i) =>
+            i === optionIndex ? { ...opt, isLoading: false } : opt
+          ))
           return
         } else if (verifyRes.status === 401) {
-          console.warn('Signature verification failed, retrying...')
+          if (verificationAttempts >= 3) {
+            throw new Error('Signature verification failed after 3 attempts.')
+          }
+          console.warn(`Signature verification failed (attempt ${verificationAttempts}/3); retrying...`)
           continue
+        } else if (!verifyRes.ok) {
+          throw new Error(`Verification request failed with status ${verifyRes.status}.`)
         }
 
         confirmResult = await verifyRes.json()
