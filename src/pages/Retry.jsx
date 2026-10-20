@@ -81,7 +81,7 @@ function Retry() {
     return res.json()
   }
 
-  async function getProcessingAddressBalances(paymentId) {
+  async function getProcessingAddressBalances(ownerAddress, paymentId) {
     try {
       const res = await fetch('https://v2.prod.halliday.xyz/payments/balances', {
         method: 'POST',
@@ -89,7 +89,13 @@ function Retry() {
           'Authorization': 'Bearer ' + HALLIDAY_API_KEY,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ payment_id: paymentId })
+        body: JSON.stringify({
+          query: {
+            source: 'OWNER',
+            owner: ownerAddress,
+            scope: { kind: 'PAYMENT', payment_id: paymentId }
+          }
+        })
       })
       return res.json()
     } catch (e) {
@@ -97,7 +103,7 @@ function Retry() {
     }
   }
 
-  async function getTypedData(withdrawToAddress, paymentId, token, amount) {
+  async function getTypedData(withdrawToAddress, withdrawFrom, token, amount) {
     try {
       const res = await fetch('https://v2.prod.halliday.xyz/payments/withdraw', {
         method: 'POST',
@@ -106,7 +112,7 @@ function Retry() {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          payment_id: paymentId,
+          withdraw_from: withdrawFrom,
           token_amounts: [{ token, amount }],
           recipient_address: withdrawToAddress,
         })
@@ -117,7 +123,7 @@ function Retry() {
     }
   }
 
-  async function confirmWithdrawal(withdrawToAddress, paymentId, token, amount, signature) {
+  async function confirmWithdrawal(signature, stateToken) {
     try {
       const res = await fetch('https://v2.prod.halliday.xyz/payments/withdraw/confirm', {
         method: 'POST',
@@ -126,14 +132,13 @@ function Retry() {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          payment_id: paymentId,
-          token_amounts: [{ token, amount }],
-          recipient_address: withdrawToAddress,
-          owner_signature: signature
+          signature,
+          state_token: stateToken
         })
       })
       const data = await res.json()
-      return data.transaction_hash
+      if (data.errors) throw Error(JSON.stringify(data.errors))
+      return data
     } catch (e) {
       console.error('confirmWithdrawal error', e)
     }
@@ -238,7 +243,7 @@ function Retry() {
 
       if (payment.status === 'COMPLETE') continue
 
-      const balances = await getProcessingAddressBalances(payment.payment_id)
+      const balances = await getProcessingAddressBalances(walletAddress, payment.payment_id)
       const amount = balances.balance_results.reduce((sum, item) => sum + +item.value.amount, 0)
 
       if (amount === 0) continue
@@ -383,7 +388,7 @@ function Retry() {
       const withdrawToAddress = confirmResult.next_instruction.deposit_info[0].deposit_address
       const typedDataToSign = await getTypedData(
         withdrawToAddress,
-        selectedPayment.paymentId,
+        option.balance.withdraw_from,
         option.balance.token,
         option.balance.value.amount
       )
@@ -397,13 +402,7 @@ function Retry() {
       const signature = await signer.signTypedData(domain, types, message)
 
       // Send signature to API to be posted onchain
-      await confirmWithdrawal(
-        withdrawToAddress,
-        selectedPayment.paymentId,
-        option.balance.token,
-        option.balance.value.amount,
-        signature
-      )
+      await confirmWithdrawal(signature, typedDataToSign.state_token)
 
       // Poll for status updates
       statusIntervalRef.current = setInterval(async () => {

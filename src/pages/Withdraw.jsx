@@ -77,7 +77,7 @@ function Withdraw() {
     return res.json()
   }
 
-  async function getProcessingAddressBalances(paymentId) {
+  async function getProcessingAddressBalances(ownerAddress, paymentId) {
     try {
       const res = await fetch('https://v2.prod.halliday.xyz/payments/balances', {
         method: 'POST',
@@ -85,7 +85,13 @@ function Withdraw() {
           'Authorization': 'Bearer ' + HALLIDAY_API_KEY,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ payment_id: paymentId })
+        body: JSON.stringify({
+          query: {
+            source: 'OWNER',
+            owner: ownerAddress,
+            scope: { kind: 'PAYMENT', payment_id: paymentId }
+          }
+        })
       })
       return res.json()
     } catch (e) {
@@ -93,7 +99,7 @@ function Withdraw() {
     }
   }
 
-  async function getTypedData(withdrawToAddress, paymentId, token, amount) {
+  async function getTypedData(withdrawToAddress, withdrawFrom, token, amount) {
     try {
       const res = await fetch('https://v2.prod.halliday.xyz/payments/withdraw', {
         method: 'POST',
@@ -102,7 +108,7 @@ function Withdraw() {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          payment_id: paymentId,
+          withdraw_from: withdrawFrom,
           token_amounts: [{ token, amount }],
           recipient_address: withdrawToAddress,
         })
@@ -113,7 +119,7 @@ function Withdraw() {
     }
   }
 
-  async function confirmWithdrawal(withdrawToAddress, paymentId, token, amount, signature) {
+  async function confirmWithdrawal(signature, stateToken) {
     try {
       const res = await fetch('https://v2.prod.halliday.xyz/payments/withdraw/confirm', {
         method: 'POST',
@@ -122,20 +128,26 @@ function Withdraw() {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          payment_id: paymentId,
-          token_amounts: [{ token, amount }],
-          recipient_address: withdrawToAddress,
-          owner_signature: signature
+          signature,
+          state_token: stateToken
         })
       })
       const data = await res.json()
-      return data.transaction_hash
+      if (data.errors) throw Error(JSON.stringify(data.errors))
+      return data
     } catch (e) {
       console.error('confirmWithdrawal error', e)
     }
   }
 
   // Fetch erring payments
+  async function getWithdrawStatus(withdrawId) {
+    const res = await fetch(`https://v2.prod.halliday.xyz/payments/withdraw/status?withdraw_id=${withdrawId}`, {
+      headers: { 'Authorization': 'Bearer ' + HALLIDAY_API_KEY }
+    })
+    return res.json()
+  }
+
   async function showErringPayments(walletAddress, assets) {
     setIsLoadingHistory(true)
     setErringPayments([])
@@ -165,7 +177,7 @@ function Withdraw() {
 
       if (payment.status === 'COMPLETE') continue
 
-      const balances = await getProcessingAddressBalances(payment.payment_id)
+      const balances = await getProcessingAddressBalances(walletAddress, payment.payment_id)
       const amount = balances.balance_results.reduce((sum, item) => sum + +item.value.amount, 0)
 
       if (amount === 0) continue
@@ -234,7 +246,7 @@ function Withdraw() {
       const withdrawToAddress = userAddress
       const typedDataToSign = await getTypedData(
         withdrawToAddress,
-        selectedPayment.paymentId,
+        option.balance.withdraw_from,
         option.balance.token,
         option.balance.value.amount
       )
@@ -247,14 +259,16 @@ function Withdraw() {
       const signer = await provider.getSigner()
       const signature = await signer.signTypedData(domain, types, message)
 
-      // Send signature to API to be posted onchain
-      const txHash = await confirmWithdrawal(
-        withdrawToAddress,
-        selectedPayment.paymentId,
-        option.balance.token,
-        option.balance.value.amount,
-        signature
-      )
+      // Send signature and state token to API to be posted onchain
+      let withdrawal = await confirmWithdrawal(signature, typedDataToSign.state_token)
+
+      // Poll every 5 seconds until the withdrawal lands onchain
+      while (withdrawal.status === 'PENDING') {
+        await new Promise(resolve => setTimeout(resolve, 5000))
+        withdrawal = await getWithdrawStatus(withdrawal.withdraw_id)
+      }
+      if (withdrawal.status !== 'SUCCESS') throw Error('Withdrawal failed: ' + JSON.stringify(withdrawal))
+      const txHash = withdrawal.transaction_hash
 
       // Show the resulting withdraw transaction on the proper block explorer
       const chain = option.balance.token.split(':')[0]
